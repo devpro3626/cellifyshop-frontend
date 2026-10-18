@@ -19,6 +19,8 @@ export interface BagLine {
   tint: string;
   price: number;
   quantity: number;
+  /** Product page link with this variant preselected (shared in the order message). */
+  url?: string;
 }
 
 interface BagState {

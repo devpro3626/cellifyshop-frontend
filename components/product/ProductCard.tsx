@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { AttributeValue, Product } from "@/lib/catalog/types";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
@@ -23,8 +23,16 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, colors, fromPrice, meta, size = "md", className, priority }: ProductCardProps) {
-  const variants = cardImages(product);
-  const [active, setActive] = useState<CardVariant>(variants[0]);
+  const variants = useMemo(() => cardImages(product), [product]);
+  const [active, setActiveState] = useState<CardVariant>(variants[0]);
+  // Images stay mounted once shown so colour changes cross-fade instead of popping in.
+  const [mounted, setMounted] = useState<CardVariant[]>([variants[0]]);
+  const [loaded, setLoaded] = useState<Set<string>>(() => new Set([variants[0].primary]));
+  const setActive = (variant: CardVariant) => {
+    setActiveState(variant);
+    setMounted((list) => (list.some((v) => v.primary === variant.primary) ? list : [...list, variant]));
+  };
+  const markLoaded = (src: string) => setLoaded((set) => (set.has(src) ? set : new Set(set).add(src)));
   const photo = product.kind === "service";
   const href = active.colorId ? `/product/${product.slug}?color=${active.colorId}` : `/product/${product.slug}`;
 
@@ -49,27 +57,36 @@ export function ProductCard({ product, colors, fromPrice, meta, size = "md", cla
           !photo && (size === "lg" ? "aspect-[5/4]" : "aspect-square"),
         )}
       >
-        <Image
-          src={active.primary}
-          alt={active.alt}
-          fill
-          preload={priority}
-          sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 90vw"
-          className={cn(
-            "transition-[opacity,transform] duration-700 ease-out-expo group-hover/card:scale-[1.04]",
-            photo ? "object-cover" : "object-contain p-6",
-            active.secondary && "group-hover/card:opacity-0",
-          )}
-        />
-        {active.secondary && (
-          <Image
-            src={active.secondary}
-            alt=""
-            fill
-            sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 90vw"
-            className="scale-[0.96] object-contain p-6 opacity-0 transition-[opacity,transform] duration-700 ease-out-expo group-hover/card:scale-100 group-hover/card:opacity-100"
-          />
-        )}
+        <div className="absolute inset-0 transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover/card:scale-[1.035]">
+          {mounted.map((v) => {
+            // Compare by image path: variant objects are rebuilt between renders.
+            const current = v.primary === active.primary;
+            const visible = current && loaded.has(v.primary);
+            const imageClass = cn("transition-opacity duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]", photo ? "object-cover" : "object-contain p-6");
+            return (
+              <div key={v.primary} className="absolute inset-0" aria-hidden={!current}>
+                <Image
+                  src={v.primary}
+                  alt={current ? v.alt : ""}
+                  fill
+                  preload={priority && v.primary === variants[0].primary}
+                  onLoad={() => markLoaded(v.primary)}
+                  sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 90vw"
+                  className={cn(imageClass, visible ? "opacity-100" : "opacity-0", visible && v.secondary && "group-hover/card:opacity-0")}
+                />
+                {v.secondary && (
+                  <Image
+                    src={v.secondary}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 90vw"
+                    className={cn(imageClass, "opacity-0", visible && "group-hover/card:opacity-100")}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="pointer-events-none relative z-10 mt-auto flex items-end justify-between gap-4 p-6 pt-0 md:p-7 md:pt-0">

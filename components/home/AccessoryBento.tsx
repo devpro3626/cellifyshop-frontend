@@ -59,7 +59,7 @@ export function AccessoryBento({ items }: { items: BentoItem[] }) {
                       alt={item.product.name}
                       fill
                       sizes={lead ? "(min-width: 768px) 50vw, 100vw" : "(min-width: 768px) 25vw, 100vw"}
-                      className="object-contain transition-transform duration-[1.2s] ease-out-expo group-hover:-rotate-2 group-hover:scale-[1.06]"
+                      className="object-contain transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:scale-[1.04]"
                     />
                   </div>
                 </Link>

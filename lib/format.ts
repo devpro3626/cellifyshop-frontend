@@ -8,6 +8,16 @@ const currency = new Intl.NumberFormat(site.locale, {
 
 export const formatPrice = (amount: number) => currency.format(amount);
 
+/**
+ * Opens a WhatsApp chat with the store and a pre-filled message. Without a
+ * configured number WhatsApp asks the visitor to pick a contact instead.
+ */
 export function whatsappLink(message: string) {
   return `https://wa.me/${site.contact.whatsapp}?text=${encodeURIComponent(message)}`;
+}
+
+/** Absolute link to a product page, optionally preselecting its options. */
+export function productUrl(slug: string, selection: Record<string, string> = {}) {
+  const query = new URLSearchParams(selection).toString();
+  return `${site.url}/product/${slug}${query ? `?${query}` : ""}`;
 }

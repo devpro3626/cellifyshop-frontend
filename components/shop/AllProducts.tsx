@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Attribute, Category, Product } from "@/lib/catalog/types";
 import { cn } from "@/lib/cn";
 import { smoothScroll } from "@/lib/scroll";
@@ -19,6 +19,9 @@ interface AllProductsProps {
 export function AllProducts({ categories, products, attributes }: AllProductsProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(categories[0]?.slug ?? "");
+  const barRef = useRef<HTMLDivElement>(null);
+  /** While a jump is animating, scroll tracking pauses so the tapped tab stays selected. */
+  const lockUntil = useRef(0);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -30,15 +33,18 @@ export function AllProducts({ categories, products, attributes }: AllProductsPro
       .filter((g) => g.items.length > 0);
   }, [categories, products, query]);
 
-  // Highlight the last category whose section has scrolled under the jump bar.
+  // Highlight the last category whose section has reached the jump bar.
   useEffect(() => {
     const update = () => {
-      let current = groups[0]?.category.slug ?? "";
+      if (performance.now() < lockUntil.current || !groups.length) return;
+      const line = (barRef.current?.getBoundingClientRect().bottom ?? 0) + 48;
+      const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
+      let current = groups[0].category.slug;
       for (const g of groups) {
         const el = document.getElementById(`category-${g.category.slug}`);
-        if (el && el.getBoundingClientRect().top < window.innerHeight * 0.35) current = g.category.slug;
+        if (el && el.getBoundingClientRect().top <= line) current = g.category.slug;
       }
-      setActive(current);
+      setActive(atBottom ? groups[groups.length - 1].category.slug : current);
     };
     update();
     window.addEventListener("scroll", update, { passive: true });
@@ -49,7 +55,7 @@ export function AllProducts({ categories, products, attributes }: AllProductsPro
 
   return (
     <div>
-      <div className="sticky top-[var(--header-h)] z-20 -mx-4 border-b border-line bg-paper/90 px-4 py-3 backdrop-blur-md md:mx-0 md:px-0">
+      <div ref={barRef} className="sticky top-[var(--header-h)] z-20 -mx-4 border-b border-line bg-paper/90 px-4 py-3 backdrop-blur-md md:mx-0 md:px-0">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <nav aria-label="Jump to category" className="no-scrollbar flex gap-2 overflow-x-auto">
             {categories.map((c) => {
@@ -59,7 +65,13 @@ export function AllProducts({ categories, products, attributes }: AllProductsPro
                   key={c.id}
                   type="button"
                   disabled={!count}
-                  onClick={() => smoothScroll.to(`#category-${c.slug}`, -150)}
+                  aria-pressed={active === c.slug}
+                  onClick={() => {
+                    setActive(c.slug);
+                    lockUntil.current = performance.now() + 1600;
+                    // Land the section just below the sticky header and jump bar.
+                    smoothScroll.to(`#category-${c.slug}`, -(64 + (barRef.current?.offsetHeight ?? 70) + 16));
+                  }}
                   className={cn(
                     "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40",
                     active === c.slug ? "bg-ink text-white" : "bg-paper-2 text-ink/70 hover:text-ink",

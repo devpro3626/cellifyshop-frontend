@@ -6,7 +6,7 @@ import { Suspense, useMemo, useState } from "react";
 import { bag } from "@/lib/bag/store";
 import type { Attribute, Product } from "@/lib/catalog/types";
 import { cn } from "@/lib/cn";
-import { formatPrice, whatsappLink } from "@/lib/format";
+import { formatPrice, productUrl, whatsappLink } from "@/lib/format";
 import { defaultSelection, describeSelection, findVariant, mediaFor, resolveOptions, selectValue, type Selection } from "@/lib/catalog/variants";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -18,7 +18,11 @@ interface ProductViewProps {
   attributes: Attribute[];
 }
 
-/** Product page body. `?color=` (from a product card) preselects a colour. */
+/**
+ * Product page body. Query parameters named after options preselect them,
+ * e.g. `?color=silver&storage=512gb` (used by product cards and the links
+ * shared in WhatsApp messages).
+ */
 export function ProductView(props: ProductViewProps) {
   return (
     <Suspense fallback={<ProductViewInner {...props} />}>
@@ -28,17 +32,25 @@ export function ProductView(props: ProductViewProps) {
 }
 
 function ProductViewWithParams(props: ProductViewProps) {
-  const color = useSearchParams().get("color");
-  return <ProductViewInner {...props} initialColor={color} key={color ?? "default"} />;
+  const params = useSearchParams();
+  const requested: Selection = {};
+  for (const option of props.product.options) {
+    const value = params.get(option.attributeId);
+    if (value) requested[option.attributeId] = value;
+  }
+  return <ProductViewInner {...props} requested={requested} key={JSON.stringify(requested)} />;
 }
 
-function initialSelection(product: Product, color?: string | null): Selection {
-  const base = defaultSelection(product);
-  return color && product.options.some((o) => o.attributeId === "color" && o.valueIds.includes(color)) ? selectValue(product, base, "color", color) : base;
+/** Start from the default variant, then apply each requested value that the product offers. */
+function initialSelection(product: Product, requested: Selection = {}): Selection {
+  return product.options.reduce((selection, option) => {
+    const value = requested[option.attributeId];
+    return value && option.valueIds.includes(value) ? selectValue(product, selection, option.attributeId, value) : selection;
+  }, defaultSelection(product));
 }
 
-function ProductViewInner({ product, attributes, initialColor }: ProductViewProps & { initialColor?: string | null }) {
-  const [selection, setSelection] = useState<Selection>(() => initialSelection(product, initialColor));
+function ProductViewInner({ product, attributes, requested }: ProductViewProps & { requested?: Selection }) {
+  const [selection, setSelection] = useState<Selection>(() => initialSelection(product, requested));
   const [added, setAdded] = useState(false);
 
   const options = useMemo(() => resolveOptions(product, attributes), [product, attributes]);
@@ -58,17 +70,20 @@ function ProductViewInner({ product, attributes, initialColor }: ProductViewProp
       image: media[0].src,
       tint: product.tint,
       price: variant.price,
+      url: productUrl(product.slug, variant.selection),
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1800);
   };
 
+  // Every WhatsApp message carries a link that reopens this exact selection.
   const options_ = description ? ` (${description})` : "";
   const price = variant ? formatPrice(variant.price) : "";
+  const link = productUrl(product.slug, variant?.selection ?? selection);
   const buyMessage = isService
-    ? `Hi CellifyShop, I'd like to book a ${product.name}${options_}. Quoted price: ${price}. When can I come in?`
-    : `Hi CellifyShop, I'd like to buy the ${product.name}${options_} for ${price}. Is it available?`;
-  const questionMessage = `Hi CellifyShop, I have a question about the ${product.name}${options_}.`;
+    ? `Hi CellifyShop, I'd like to book a ${product.name}${options_}. Quoted price: ${price}. When can I come in?\n\n${link}`
+    : `Hi CellifyShop, I'd like to buy the ${product.name}${options_} for ${price}. Is it available?\n\n${link}`;
+  const questionMessage = `Hi CellifyShop, I have a question about the ${product.name}${options_}.\n\n${link}`;
 
   const assurances: { icon: IconName; text: string }[] = isService
     ? [

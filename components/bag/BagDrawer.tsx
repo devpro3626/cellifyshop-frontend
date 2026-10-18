@@ -5,14 +5,17 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect } from "react";
 import { bag, useBag, type BagLine } from "@/lib/bag/store";
-import { formatPrice, whatsappLink } from "@/lib/format";
+import { formatPrice, productUrl, whatsappLink } from "@/lib/format";
 import { smoothScroll } from "@/lib/scroll";
 import { buttonClass } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 
+/** Order summary for WhatsApp; each line links back to the exact variant. */
 function orderMessage(lines: BagLine[], subtotal: number) {
-  const rows = lines.map((l) => `• ${l.quantity} × ${l.name} (${l.description}): ${formatPrice(l.price * l.quantity)}`);
-  return [`Hi CellifyShop, I'd like to order:`, ...rows, ``, `Subtotal: ${formatPrice(subtotal)}`].join("\n");
+  const rows = lines.map(
+    (l) => `• ${l.quantity} × ${l.name} (${l.description}): ${formatPrice(l.price * l.quantity)}\n  ${l.url ?? productUrl(l.productSlug)}`,
+  );
+  return [`Hi CellifyShop, I'd like to order:`, ``, ...rows, ``, `Subtotal: ${formatPrice(subtotal)}`].join("\n");
 }
 
 export function BagDrawer() {

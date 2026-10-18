@@ -144,6 +144,29 @@ html.lenis body {
   animation: marquee var(--marquee-duration, 40s) linear infinite;
 }
 
+/* Hero haze: three layers drifting on different, slow cycles. */
+@keyframes smoke-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-4%, 3%, 0) scale(1.08); }
+}
+@keyframes smoke-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
+  50% { transform: translate3d(6%, -5%, 0) scale(1.12); opacity: 0.6; }
+}
+@keyframes smoke-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(5%, 4%, 0) scale(0.95); }
+}
+@utility animate-smoke-a {
+  animation: smoke-a 14s ease-in-out infinite;
+}
+@utility animate-smoke-b {
+  animation: smoke-b 19s ease-in-out infinite;
+}
+@utility animate-smoke-c {
+  animation: smoke-c 23s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

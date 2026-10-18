@@ -55,7 +55,7 @@ const fragmentShader = /* glsl */ `
 
     // Fine contour lines that read like light caught on brushed metal.
     float contour = pow(1.0 - abs(sin((f * 9.0 + t * 2.0) * 3.14159)), 40.0);
-    col += mix(uColor, vec3(1.0), 0.4) * contour * 0.07 * glow;
+    col += mix(uColor, vec3(1.0), 0.4) * contour * 0.035 * glow;
 
     // Vignette and dither.
     col *= smoothstep(1.35, 0.2, length(p * vec2(0.85, 1.0)));
