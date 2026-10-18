@@ -7,15 +7,17 @@ import { logout } from "@/lib/admin/actions";
 import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/Logo";
+import { ProgressBar } from "./ProgressBar";
 
 const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/admin", label: "Dashboard", icon: "sparkle" },
   { href: "/admin/products", label: "Products", icon: "bag" },
   { href: "/admin/categories", label: "Categories", icon: "menu" },
   { href: "/admin/taxonomy", label: "Taxonomy", icon: "check" },
+  { href: "/admin/messages", label: "Messages", icon: "mail" },
 ];
 
-export function AdminShell({ children }: { children: ReactNode }) {
+export function AdminShell({ children, unread = 0 }: { children: ReactNode; unread?: number }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) => (href === "/admin" ? pathname === href : pathname.startsWith(href));
@@ -28,13 +30,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
           href={item.href}
           onClick={() => setOpen(false)}
           aria-current={isActive(item.href) ? "page" : undefined}
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-[0.92rem] transition-colors",
-            isActive(item.href) ? "bg-ink text-white" : "text-ink/70 hover:bg-ink/5 hover:text-ink",
-          )}
+          className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-[0.92rem] transition-colors", isActive(item.href) ? "bg-ink text-white" : "text-ink/70 hover:bg-ink/5 hover:text-ink")}
         >
           <Icon name={item.icon} size={18} />
           {item.label}
+          {item.href === "/admin/messages" && unread > 0 && (
+            <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[0.7rem] font-semibold tabular-nums", isActive(item.href) ? "bg-white text-ink" : "bg-accent text-white")}>{unread}</span>
+          )}
         </Link>
       ))}
     </nav>
@@ -55,6 +57,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-[#f6f6f4] lg:grid lg:grid-cols-[240px_1fr]">
+      <ProgressBar />
       <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-line bg-surface p-4 lg:flex">
         <Link href="/admin" className="flex items-center gap-2.5 px-2 pt-1">
           <LogoMark className="h-6 w-6" />

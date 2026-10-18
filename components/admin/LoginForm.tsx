@@ -13,7 +13,7 @@ export function LoginForm() {
         <input name="password" type="password" required autoFocus autoComplete="current-password" className={inputClass} />
       </Field>
       {state && !state.ok && <Notice>{state.error}</Notice>}
-      <Button type="submit" variant="dark" disabled={pending} className="w-full">
+      <Button type="submit" variant="dark" loading={pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
     </form>

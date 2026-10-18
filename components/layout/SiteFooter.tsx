@@ -10,16 +10,13 @@ const columns = [
       { label: "All products", href: "/products" },
       { label: "iPhone", href: "/products/iphones" },
       { label: "Accessories", href: "/products/accessories" },
-      { label: "iPhone 18 Pro", href: "/product/iphone-18-pro" },
     ],
   },
   {
     title: "Repair",
     links: [
       { label: "All repairs", href: "/products/repairs" },
-      { label: "Screen replacement", href: "/product/screen-replacement" },
-      { label: "Battery replacement", href: "/product/battery-replacement" },
-      { label: "Water damage", href: "/product/water-damage-treatment" },
+      { label: "Book a repair", href: "/contact" },
     ],
   },
   {

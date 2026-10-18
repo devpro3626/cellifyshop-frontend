@@ -1,10 +1,14 @@
 # CellifyShop: storefront and admin
 
-Next.js 16 (App Router, Cache Components) store for iPhones, same-day repairs and accessories, with a simple admin portal.
+Next.js 16 (App Router, Cache Components) store for iPhones, same-day repairs and accessories, with an admin portal. All data comes from the CellifyShop API in `../cellify-backend` (Express + MongoDB).
 
 ```bash
+# 1. Start the API first (see ../cellify-backend/README.md)
+cd ../cellify-backend && npm run dev
+
+# 2. Then the storefront
 npm run dev      # http://localhost:3000
-npm run build    # production build
+npm run build    # production build (the API must be running: pages are prerendered from it)
 npm run images   # (re)download the starting product and editorial imagery
 ```
 
@@ -15,45 +19,59 @@ npm run images   # (re)download the starting product and editorial imagery
 | `/` | Home |
 | `/products` | All products, grouped by category |
 | `/products/[category]` | One category with search, sort and filters |
-| `/product/[slug]` | Product page: gallery, options, price, Buy on WhatsApp |
-| `/about`, `/contact` | Company and contact pages |
+| `/product/[id]` | Product page: gallery, options, price, Buy on WhatsApp |
+| `/about` | Company page |
+| `/contact` | Contact page; the form saves messages to the admin inbox |
 | `/admin` | Admin portal (password protected) |
 
-Prices are in AED. Buy, booking and contact buttons open WhatsApp (+971 56 236 1397) with a pre-filled message. Contact details live in `lib/config/site.ts`.
+Prices are in AED. Buy, booking and chat buttons open WhatsApp with a pre-filled message and a link to the chosen product. Contact details come from environment variables (see `.env.example`).
 
-## Admin portal (version 1)
+## Environment
 
-Sign in at `/admin`. Set the password in `.env.local`:
+| Variable | Purpose |
+| --- | --- |
+| `API_URL` | Base URL of the API, e.g. `http://localhost:4000/api`. Used on the server only |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | WhatsApp number with country code |
+| `NEXT_PUBLIC_WHATSAPP_DISPLAY` | How the number is shown on the site |
+| `NEXT_PUBLIC_SITE_URL` | Public address, used for product links in WhatsApp messages |
 
-```bash
-ADMIN_PASSWORD=your-strong-password
-ADMIN_SECRET=another-long-random-string   # optional, signs the session cookie
-```
+The admin password is set in the API (`ADMIN_PASSWORD` in `cellify-backend/.env`).
 
-In development, if `ADMIN_PASSWORD` is not set, the password is `cellify-admin` (shown on the sign-in page). In production the portal stays locked until `ADMIN_PASSWORD` is set.
+## Admin portal
 
-- **Products:** create and edit name, category, images (upload or path, tag by colour), options from the taxonomy, and a price and stock for every variant. Highlights, specs and box contents are edited here too.
-- **Categories:** create, edit, reorder, and delete empty categories.
+Sign in at `/admin` with the API's admin password. The API returns a token, which is kept in an httpOnly cookie.
+
+- **Products:** paginated list with search and category filter. Create and edit name, category, image links (tagged by colour), options from the taxonomy, and a price and stock for every variant.
+- **Categories:** create, edit, reorder, and delete empty categories. The web address is generated from the name.
 - **Taxonomy:** create and edit attributes (Colour, Storage, Condition…) and their values. Values in use can't be removed.
+- **Messages:** contact-form inbox with All / Unread / Read tabs, search and pagination. Reply by call, WhatsApp or email; mark read or delete.
 
-Changes appear on the store immediately: every save calls `updateTag("catalog")`.
+Saves refresh the store immediately (`updateTag("catalog")`).
 
-### Where data is stored
+## How the frontend talks to the API
 
-The catalogue is one JSON file, `data/catalog.json`, created from the seed in `lib/catalog/data` on first run. Uploaded images go to `data/uploads` and are served from `/uploads/…`. This suits a single server (`next start`, a VPS, or a container with a persistent volume). For serverless hosting, replace `readCatalog`/`writeCatalog` in `lib/catalog/store.ts` and the upload target in `lib/admin/actions.ts` with a database and object storage; no page code changes.
+`lib/api/client.ts` creates two axios instances with interceptors:
+
+- **response interceptor** (both): turns any failure into a typed `ApiError` with the API's message, or a clear message when the API is unreachable.
+- **request interceptor** (`adminApi`): attaches the admin token from the httpOnly cookie as `Authorization: Bearer …`.
+
+`lib/api/catalog.api.ts` and `lib/api/messages.api.ts` wrap the endpoints. Storefront reads go through `lib/catalog/repository.ts` (cached, tag `catalog`); admin writes go through server actions in `lib/admin/actions.ts`.
 
 ## Structure
 
 ```
 app/(store)/      Storefront pages
 app/admin/        Admin portal: login and the (panel) screens behind the session check
-app/uploads/      Serves uploaded images
 components/       home, product, shop, layout, bag, admin, three (hero light field), ui
-lib/catalog/      types, seed data, store (file), repository (cached reads), variant helpers
-lib/admin/        auth (signed session cookie), server actions
+lib/api/          axios clients, interceptors and endpoint wrappers
+lib/catalog/      types, repository (cached reads), variant helpers
+lib/admin/        session, server actions, admin data helpers
+lib/contact/      contact-form server action
 lib/config/       site settings: name, currency, contact, navigation
 ```
 
 ## Imagery
 
-`scripts/fetch-images.mjs` downloads the starting images: product cut-outs from Apple's public store image service, and workshop photography from Unsplash (Unsplash License, credits in the manifest). Before going live, confirm you're permitted to use manufacturer imagery, or replace the files with your own. New images can also be uploaded from the admin portal.
+Products and categories use image links. The starting images live in `public/images` and were downloaded by `scripts/fetch-images.mjs`: product cut-outs from Apple's public store image service, and workshop photography from Unsplash (Unsplash License, credits in the manifest). Before going live, confirm you're permitted to use manufacturer imagery, or replace it with your own.
+
+`next.config.ts` allows images from any https host so admin-added links display. Narrow `images.remotePatterns` to your image hosts once they're settled.

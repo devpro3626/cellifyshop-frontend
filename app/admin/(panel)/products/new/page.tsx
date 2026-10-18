@@ -10,7 +10,6 @@ export default async function NewProductPage() {
   const { categories, attributes } = await getAdminCatalog();
   const blank: Product = {
     id: "",
-    slug: "",
     name: "",
     categoryId: categories[0]?.id ?? "",
     kind: "device",

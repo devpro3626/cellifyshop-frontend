@@ -61,7 +61,7 @@ export default async function HomePage() {
 
       <RepairShowcase
         rows={repairs.map((p) => ({
-          slug: p.slug,
+          id: p.id,
           name: p.name,
           summary: p.summary,
           image: p.media[0].src,

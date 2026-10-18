@@ -34,7 +34,7 @@ export function ProductCard({ product, colors, fromPrice, meta, size = "md", cla
   };
   const markLoaded = (src: string) => setLoaded((set) => (set.has(src) ? set : new Set(set).add(src)));
   const photo = product.kind === "service";
-  const href = active.colorId ? `/product/${product.slug}?color=${active.colorId}` : `/product/${product.slug}`;
+  const href = active.colorId ? `/product/${product.id}?color=${active.colorId}` : `/product/${product.id}`;
 
   return (
     <article className={cn("group/card relative flex flex-col overflow-hidden rounded-[28px] transition-shadow duration-500 hover:shadow-[0_30px_60px_-30px_rgba(11,11,13,.35)]", className)} style={{ backgroundColor: product.tint }}>

@@ -1,4 +1,4 @@
-/** URL-safe slug: lowercase letters, numbers and single dashes. */
+/** URL-safe slug: lowercase letters, numbers and single dashes (used for SKU previews). */
 export function slugify(value: string) {
   return value
     .normalize("NFKD")
@@ -7,9 +7,4 @@ export function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-}
-
-/** Stable-looking id with a short random suffix, e.g. `prd-iphone-18-pro-4f2a`. */
-export function uniqueId(prefix: string, slug: string) {
-  return `${prefix}-${slug}-${Math.random().toString(36).slice(2, 6)}`;
 }

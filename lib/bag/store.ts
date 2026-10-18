@@ -11,7 +11,7 @@ import { useSyncExternalStore } from "react";
 export interface BagLine {
   /** variant id; one line per variant */
   id: string;
-  productSlug: string;
+  productId: string;
   name: string;
   /** e.g. "Cosmic Orange · 256GB · Brand new" */
   description: string;
@@ -28,7 +28,7 @@ interface BagState {
   open: boolean;
 }
 
-const STORAGE_KEY = "cellify.bag.v1";
+const STORAGE_KEY = "cellify.bag.v2";
 const EMPTY: BagState = { lines: [], open: false };
 
 let state: BagState = EMPTY;

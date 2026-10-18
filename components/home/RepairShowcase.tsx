@@ -11,7 +11,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
 export interface RepairRow {
-  slug: string;
+  id: string;
   name: string;
   summary: string;
   image: string;
@@ -60,8 +60,8 @@ export function RepairShowcase({ rows }: { rows: RepairRow[] }) {
           onPointerLeave={() => setHovered(null)}
         >
           {rows.map((row, i) => (
-            <Reveal as="li" key={row.slug} delay={i * 0.04} y={16} onPointerEnter={(e) => e.pointerType === "mouse" && setHovered(row)}>
-                <Link href={`/product/${row.slug}`} className="group grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 border-b border-line-strong py-6 md:grid-cols-[3rem_1.3fr_1fr_auto_auto] md:py-8">
+            <Reveal as="li" key={row.id} delay={i * 0.04} y={16} onPointerEnter={(e) => e.pointerType === "mouse" && setHovered(row)}>
+                <Link href={`/product/${row.id}`} className="group grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 border-b border-line-strong py-6 md:grid-cols-[3rem_1.3fr_1fr_auto_auto] md:py-8">
                   <span className="hidden font-medium tabular-nums text-xs text-mute md:block">{String(i + 1).padStart(2, "0")}</span>
                   <span className="font-display text-[clamp(1.2rem,2.2vw,1.77rem)] font-semibold tracking-[-0.04em] transition-transform duration-500 ease-out-expo group-hover:translate-x-2">{row.name}</span>
                   <span className="col-span-2 row-start-2 text-[0.92rem] text-mute md:col-span-1 md:row-start-auto">{row.summary}</span>
@@ -112,7 +112,7 @@ export function RepairShowcase({ rows }: { rows: RepairRow[] }) {
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           >
             <AnimatePresence mode="popLayout">
-              <motion.div key={hovered.slug} className="absolute inset-0" initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
+              <motion.div key={hovered.id} className="absolute inset-0" initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
                 <Image src={hovered.image} alt="" fill sizes="240px" className="object-cover" />
               </motion.div>
             </AnimatePresence>

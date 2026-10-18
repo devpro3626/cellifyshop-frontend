@@ -5,14 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { deleteProduct, saveProduct } from "@/lib/admin/actions";
+import { withBusy } from "@/lib/admin/busy";
 import { slugify } from "@/lib/admin/slug";
 import type { Attribute, Category, Product, ProductKind, ProductOption, ProductVariant } from "@/lib/catalog/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { useConfirm } from "./ConfirmDialog";
+import { Flash, useFlash } from "./Flash";
 import { AddButton, RemoveButton, SpecList, StringList } from "./ListEditors";
-import { Card, Field, inputClass, Notice, textareaClass, Toggle } from "./ui";
-import { UploadButton } from "./UploadButton";
+import { NumberInput } from "./NumberInput";
+import { Card, Field, inputClass, textareaClass, Toggle } from "./ui";
 
 interface ProductFormProps {
   initial: Product;
@@ -33,8 +36,15 @@ const selectionKey = (selection: Record<string, string>) =>
     .map((k) => `${k}:${selection[k]}`)
     .join("|");
 
-/** Every combination of the chosen option values, keeping prices already entered. */
-function buildVariants(options: ProductOption[], previous: ProductVariant[], defaultPrice: number, slug: string): ProductVariant[] {
+/** An image address the API accepts: a full http(s) link, or a path served by the store (/images/...). */
+const isImageLink = (value: string) => /^https?:\/\/\S+$/i.test(value) || /^\/[\w\-./%]+$/.test(value);
+
+/**
+ * Every combination of the chosen option values, keeping prices already
+ * entered. SKUs are previewed from the product name; the API fills any gaps.
+ */
+function buildVariants(options: ProductOption[], previous: ProductVariant[], defaultPrice: number, name: string): ProductVariant[] {
+  const slug = slugify(name) || "item";
   const combos = options.reduce<Record<string, string>[]>((acc, o) => acc.flatMap((c) => o.valueIds.map((v) => ({ ...c, [o.attributeId]: v }))), [{}]);
   const byKey = new Map(previous.map((v) => [selectionKey(v.selection), v]));
   return combos.map((selection) => {
@@ -58,12 +68,13 @@ function buildVariants(options: ProductOption[], previous: ProductVariant[], def
 export function ProductForm({ initial, categories, attributes, isNew }: ProductFormProps) {
   const router = useRouter();
   const [draft, setDraft] = useState<Product>(initial);
-  const [slugTouched, setSlugTouched] = useState(!isNew);
   const [defaultPrice, setDefaultPrice] = useState(initial.variants[0]?.price ?? 0);
   const [bulkStock, setBulkStock] = useState("");
-  const [imagePath, setImagePath] = useState("");
-  const [status, setStatus] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+  const [imageLink, setImageLink] = useState("");
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [status, setStatus] = useFlash();
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
 
   const set = <K extends keyof Product>(key: K, value: Product[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const colorOption = draft.options.find((o) => o.attributeId === "color");
@@ -71,7 +82,11 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
   const usedAttributes = useMemo(() => draft.options.map((o) => attributes.find((a) => a.id === o.attributeId)).filter((a): a is Attribute => Boolean(a)), [draft.options, attributes]);
 
   const setOptions = (options: ProductOption[]) =>
-    setDraft((d) => ({ ...d, options, variants: buildVariants(options, d.variants, defaultPrice, d.slug || "item") }));
+    setDraft((d) => ({
+      ...d,
+      options,
+      variants: buildVariants(options, d.variants, defaultPrice, d.name),
+    }));
 
   const toggleValue = (attribute: Attribute, valueId: string) => {
     const current = draft.options.find((o) => o.attributeId === attribute.id)?.valueIds ?? [];
@@ -85,9 +100,19 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
     setOptions(options);
   };
 
-  const updateVariant = (index: number, patch: Partial<ProductVariant>) => set("variants", draft.variants.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+  const updateVariant = (index: number, patch: Partial<ProductVariant>) =>
+    set(
+      "variants",
+      draft.variants.map((v, i) => (i === index ? { ...v, ...patch } : v)),
+    );
 
-  const addImage = (src: string, alt = draft.name) => set("media", [...draft.media, { src, alt }]);
+  const addImage = () => {
+    const src = imageLink.trim();
+    if (!isImageLink(src)) return setImageError("Paste an image link starting with https://");
+    set("media", [...draft.media, { src, alt: draft.name }]);
+    setImageLink("");
+    setImageError(null);
+  };
   const moveImage = (index: number, dir: -1 | 1) => {
     const media = [...draft.media];
     const target = index + dir;
@@ -99,7 +124,7 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
   const save = () =>
     startTransition(async () => {
       setStatus(null);
-      const result = await saveProduct({ ...draft, highlights: draft.highlights.filter(Boolean), inTheBox: draft.inTheBox?.filter(Boolean) });
+      const result = await withBusy(() => saveProduct(draft));
       if (!result.ok) {
         setStatus({ tone: "error", text: result.error });
         return;
@@ -109,40 +134,29 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
       router.refresh();
     });
 
-  const remove = () => {
-    if (!window.confirm(`Delete “${draft.name}”? This can't be undone.`)) return;
-    startTransition(async () => {
-      const result = await deleteProduct(draft.id);
-      if (!result.ok) return setStatus({ tone: "error", text: result.error });
+  const remove = async () => {
+    const deleted = await confirm({
+      title: `Delete “${draft.name}”?`,
+      description: "It will be removed from the store straight away. This can't be undone.",
+      confirmLabel: "Delete product",
+      tone: "danger",
+      action: async () => {
+        const result = await withBusy(() => deleteProduct(draft.id));
+        return result.ok ? undefined : result.error;
+      },
+    });
+    if (deleted) {
       router.push("/admin/products");
       router.refresh();
-    });
+    }
   };
 
   return (
-    <div className="grid gap-6 pb-28">
+    <div className="grid gap-6 pb-40 sm:pb-28">
       <Card title="Basics">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Name">
-            <input
-              value={draft.name}
-              onChange={(e) => {
-                const name = e.target.value;
-                setDraft((d) => ({ ...d, name, slug: slugTouched ? d.slug : slugify(name) }));
-              }}
-              placeholder="iPhone 18 Pro"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="URL slug" hint={`Shown at /product/${draft.slug || "…"}`}>
-            <input
-              value={draft.slug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                set("slug", slugify(e.target.value));
-              }}
-              className={inputClass}
-            />
+            <input value={draft.name} onChange={(e) => set("name", e.target.value)} placeholder="iPhone 18 Pro" className={inputClass} />
           </Field>
           <Field label="Category">
             <select value={draft.categoryId} onChange={(e) => set("categoryId", e.target.value)} className={inputClass}>
@@ -192,20 +206,42 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
         </div>
       </Card>
 
-      <Card title="Images" description="The first image is the main one. Tag images with a colour to show them when that colour is selected.">
+      <Card title="Images" description="Add images by link. The first one is the main image; tag images with a colour to show them when that colour is selected.">
         {draft.media.length > 0 && (
           <ul className="mb-4 grid gap-3">
             {draft.media.map((m, i) => (
               <li key={`${m.src}-${i}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-line p-2.5 sm:flex-nowrap">
                 <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg" style={{ backgroundColor: draft.tint }}>
-                  <Image src={m.src} alt="" fill sizes="64px" className={draft.kind === "service" ? "object-cover" : "object-contain p-1"} />
+                  <Image src={m.src} alt="" fill unoptimized sizes="64px" className={draft.kind === "service" ? "object-cover" : "object-contain p-1"} />
                 </span>
-                <input value={m.alt} onChange={(e) => set("media", draft.media.map((x, j) => (j === i ? { ...x, alt: e.target.value } : x)))} placeholder="Image description" className={cn(inputClass, "min-w-0 flex-1")} />
+                <input
+                  value={m.alt}
+                  onChange={(e) =>
+                    set(
+                      "media",
+                      draft.media.map((x, j) => (j === i ? { ...x, alt: e.target.value } : x)),
+                    )
+                  }
+                  placeholder="Image description"
+                  className={cn(inputClass, "min-w-0 flex-1 basis-40")}
+                />
                 {colorOption && colorAttribute && (
                   <select
                     value={m.match?.color ?? ""}
-                    onChange={(e) => set("media", draft.media.map((x, j) => (j === i ? { ...x, match: e.target.value ? { color: e.target.value } : undefined } : x)))}
-                    className={cn(inputClass, "w-40")}
+                    onChange={(e) =>
+                      set(
+                        "media",
+                        draft.media.map((x, j) =>
+                          j === i
+                            ? {
+                                ...x,
+                                match: e.target.value ? { color: e.target.value } : undefined,
+                              }
+                            : x,
+                        ),
+                      )
+                    }
+                    className={cn(inputClass, "min-w-0 flex-1 sm:w-40 sm:flex-none")}
                   >
                     <option value="">All colours</option>
                     {colorOption.valueIds.map((id) => (
@@ -215,37 +251,58 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
                     ))}
                   </select>
                 )}
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => moveImage(i, -1)} disabled={i === 0} aria-label="Move up" className="grid h-10 w-9 place-items-center rounded-lg border border-line disabled:opacity-30">
+                <div className="ml-auto flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveImage(i, -1)}
+                    disabled={i === 0}
+                    aria-label="Move up"
+                    className="grid h-10 w-9 place-items-center rounded-lg border border-line disabled:opacity-30"
+                  >
                     <Icon name="chevronLeft" size={16} className="rotate-90" />
                   </button>
-                  <button type="button" onClick={() => moveImage(i, 1)} disabled={i === draft.media.length - 1} aria-label="Move down" className="grid h-10 w-9 place-items-center rounded-lg border border-line disabled:opacity-30">
+                  <button
+                    type="button"
+                    onClick={() => moveImage(i, 1)}
+                    disabled={i === draft.media.length - 1}
+                    aria-label="Move down"
+                    className="grid h-10 w-9 place-items-center rounded-lg border border-line disabled:opacity-30"
+                  >
                     <Icon name="chevronRight" size={16} className="rotate-90" />
                   </button>
-                  <RemoveButton onClick={() => set("media", draft.media.filter((_, j) => j !== i))} />
+                  <RemoveButton
+                    onClick={() =>
+                      set(
+                        "media",
+                        draft.media.filter((_, j) => j !== i),
+                      )
+                    }
+                  />
                 </div>
               </li>
             ))}
           </ul>
         )}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          <UploadButton multiple label="Upload images" onUploaded={(src, fileName) => addImage(src, `${draft.name || fileName}`)} />
-          <div className="flex flex-1 gap-2">
-            <input value={imagePath} onChange={(e) => setImagePath(e.target.value)} placeholder="…or an existing path, e.g. /images/products/airpods-5/main-1.webp" className={inputClass} />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-10 rounded-lg"
-              onClick={() => {
-                if (!imagePath.trim()) return;
-                addImage(imagePath.trim());
-                setImagePath("");
+        <div className="grid gap-1.5">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={imageLink}
+              onChange={(e) => setImageLink(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addImage();
+                }
               }}
-            >
-              Add
+              placeholder="Paste an image link, e.g. https://example.com/iphone-front.webp"
+              className={inputClass}
+              type="url"
+            />
+            <Button type="button" variant="outline" size="sm" className="h-10 shrink-0 rounded-lg" onClick={addImage}>
+              Add image
             </Button>
           </div>
+          {imageError ? <span className="text-[0.8rem] text-[#a1261b]">{imageError}</span> : <span className="text-[0.78rem] text-mute">Use a direct link to a JPG, PNG or WebP image.</span>}
         </div>
       </Card>
 
@@ -283,61 +340,87 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
           })}
         </div>
 
-        <div className="mt-8 flex flex-wrap items-end gap-3 border-t border-line pt-5">
+        <div className="mt-8 grid grid-cols-[1fr_auto] items-end gap-3 border-t border-line pt-5 sm:flex sm:flex-wrap">
           <Field label="Price for new variants (AED)">
-            <input type="number" min={0} value={defaultPrice} onChange={(e) => setDefaultPrice(Number(e.target.value))} className={cn(inputClass, "w-44")} />
-          </Field>
-          <Button type="button" variant="outline" size="sm" className="h-10 rounded-lg" onClick={() => set("variants", draft.variants.map((v) => ({ ...v, price: defaultPrice })))}>
-            Apply to all
-          </Button>
-          <Field label="Stock for all">
-            <input type="number" min={0} value={bulkStock} onChange={(e) => setBulkStock(e.target.value)} className={cn(inputClass, "w-28")} />
+            <NumberInput decimal value={defaultPrice} onChange={setDefaultPrice} className="sm:w-44" />
           </Field>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="h-10 rounded-lg"
-            onClick={() => bulkStock !== "" && set("variants", draft.variants.map((v) => ({ ...v, stock: Math.max(0, Number(bulkStock)) })))}
+            onClick={() =>
+              set(
+                "variants",
+                draft.variants.map((v) => ({ ...v, price: defaultPrice })),
+              )
+            }
+          >
+            Apply to all
+          </Button>
+          <Field label="Stock for all">
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              value={bulkStock}
+              onChange={(e) => setBulkStock(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
+              placeholder="e.g. 5"
+              className={cn(inputClass, "tabular-nums sm:w-28")}
+            />
+          </Field>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 rounded-lg"
+            onClick={() =>
+              bulkStock !== "" &&
+              set(
+                "variants",
+                draft.variants.map((v) => ({
+                  ...v,
+                  stock: Math.max(0, Number(bulkStock)),
+                })),
+              )
+            }
           >
             Apply stock
           </Button>
         </div>
 
-        <div className="mt-5 overflow-x-auto rounded-xl border border-line">
-          <table className="w-full min-w-[560px] text-left text-[0.88rem]">
-            <thead className="bg-paper text-[0.78rem] text-mute">
-              <tr>
-                <th className="px-3 py-2.5 font-medium">Variant</th>
-                <th className="px-3 py-2.5 font-medium">SKU</th>
-                <th className="w-36 px-3 py-2.5 font-medium">Price (AED)</th>
-                <th className="w-28 px-3 py-2.5 font-medium">Stock</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {draft.variants.map((v, i) => (
-                <tr key={v.id}>
-                  <td className="px-3 py-2">
-                    {usedAttributes.length
-                      ? usedAttributes.map((a) => a.values.find((x) => x.id === v.selection[a.id])?.label).join(" · ")
-                      : "Single variant"}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input value={v.sku} onChange={(e) => updateVariant(i, { sku: e.target.value.toUpperCase() })} className={cn(inputClass, "h-9 font-medium")} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="number" min={0} value={v.price} onChange={(e) => updateVariant(i, { price: Number(e.target.value) })} className={cn(inputClass, "h-9 tabular-nums")} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="number" min={0} value={v.stock} onChange={(e) => updateVariant(i, { stock: Number(e.target.value) })} className={cn(inputClass, "h-9 tabular-nums")} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* A table on wide screens; each variant becomes a small card on phones. */}
+        <div className="mt-5 overflow-hidden rounded-xl border border-line text-[0.88rem]">
+          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_9rem_7rem] gap-3 bg-paper px-3 py-2.5 text-[0.78rem] font-medium text-mute md:grid">
+            <span>Variant</span>
+            <span>SKU</span>
+            <span>Price (AED)</span>
+            <span>Stock</span>
+          </div>
+          <ul className="divide-y divide-line">
+            {draft.variants.map((v, i) => (
+              <li key={selectionKey(v.selection)} className="grid grid-cols-2 items-center gap-x-3 gap-y-2 px-3 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_9rem_7rem] md:py-2">
+                <span className="col-span-2 font-medium md:col-span-1 md:font-normal">
+                  {usedAttributes.length ? usedAttributes.map((a) => a.values.find((x) => x.id === v.selection[a.id])?.label).join(" · ") : "Single variant"}
+                </span>
+                <label className="col-span-2 grid gap-1 md:col-span-1">
+                  <span className="text-[0.75rem] text-mute md:sr-only">SKU</span>
+                  <input value={v.sku} onChange={(e) => updateVariant(i, { sku: e.target.value.toUpperCase() })} className={cn(inputClass, "h-9 font-medium")} />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[0.75rem] text-mute md:sr-only">Price (AED)</span>
+                  <NumberInput decimal value={v.price} onChange={(price) => updateVariant(i, { price })} className="h-9" />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[0.75rem] text-mute md:sr-only">Stock</span>
+                  <NumberInput value={v.stock} onChange={(stock) => updateVariant(i, { stock })} className="h-9" />
+                </label>
+              </li>
+            ))}
+          </ul>
         </div>
         <p className="mt-2 text-[0.8rem] text-mute">
-          {draft.variants.length} variant{draft.variants.length === 1 ? "" : "s"}. Set stock to 0 to show a variant as sold out.
+          {draft.variants.length} variant
+          {draft.variants.length === 1 ? "" : "s"}. Set stock to 0 to show a variant as sold out.
         </p>
       </Card>
 
@@ -354,11 +437,12 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
       </Card>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur lg:left-[240px]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-5 py-3 md:px-10">
-          <div className="min-w-0 flex-1">{status && <Notice tone={status.tone}>{status.text}</Notice>}</div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-x-3 gap-y-2 px-4 py-3 sm:px-5 md:px-10">
+          <Flash flash={status} onDismiss={() => setStatus(null)} className="min-w-0 basis-full sm:basis-0 sm:flex-1" />
+          {!status && <span className="hidden flex-1 sm:block" />}
           {!isNew && (
             <>
-              <Link href={`/product/${initial.slug}`} target="_blank" className="text-[0.88rem] text-mute hover:text-ink">
+              <Link href={`/product/${initial.id}`} target="_blank" className="text-[0.88rem] text-mute hover:text-ink">
                 View in store
               </Link>
               <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={pending} className="text-[#a1261b]">
@@ -366,11 +450,12 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
               </Button>
             </>
           )}
-          <Button type="button" variant="dark" onClick={save} disabled={pending}>
+          <Button type="button" variant="dark" onClick={save} loading={pending}>
             {pending ? "Saving…" : isNew ? "Create product" : "Save changes"}
           </Button>
         </div>
       </div>
+      {dialog}
       {draft.variants.length === 0 && <AddButton onClick={() => setOptions([])}>Create a single variant</AddButton>}
     </div>
   );

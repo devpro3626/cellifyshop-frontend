@@ -1,13 +1,14 @@
 import { cacheLife, cacheTag } from "next/cache";
-import { readCatalog } from "./store";
+import { catalogApi } from "@/lib/api/catalog.api";
 import type { Attribute, Category, Product, ProductQuery } from "./types";
 import { priceRange } from "./variants";
 
 /**
  * The single entry point the storefront uses to read catalogue data.
  *
- * Reads go through `use cache` tagged "catalog"; the admin portal calls
- * `updateTag("catalog")` after every change, so edits appear immediately.
+ * Data comes from the CellifyShop API (GET /api/catalog) through a cached
+ * call tagged "catalog". Admin actions call `updateTag("catalog")` after each
+ * change, so edits appear immediately; other changes refresh within the hour.
  */
 
 export const CATALOG_TAG = "catalog";
@@ -16,7 +17,7 @@ async function catalog() {
   "use cache";
   cacheTag(CATALOG_TAG);
   cacheLife("hours");
-  return readCatalog();
+  return catalogApi.getCatalog();
 }
 
 function sortProducts(list: Product[], sort: ProductQuery["sort"] = "featured") {
@@ -31,11 +32,6 @@ function sortProducts(list: Product[], sort: ProductQuery["sort"] = "featured") 
     default:
       return sorted.sort((a, b) => Number(b.featured) - Number(a.featured));
   }
-}
-
-/** Whole catalogue (admin portal). Cached and refreshed by updateTag after edits. */
-export async function getCatalog() {
-  return catalog();
 }
 
 export async function getAttributes(): Promise<Attribute[]> {
@@ -66,12 +62,12 @@ export async function getProducts(query: ProductQuery = {}): Promise<Product[]> 
   return query.limit ? sorted.slice(0, query.limit) : sorted;
 }
 
-export async function getProduct(slug: string): Promise<Product | undefined> {
-  return (await catalog()).products.find((p) => p.slug === slug);
+export async function getProduct(id: string): Promise<Product | undefined> {
+  return (await catalog()).products.find((p) => p.id === id);
 }
 
-export async function getProductSlugs(): Promise<string[]> {
-  return (await catalog()).products.map((p) => p.slug);
+export async function getProductIds(): Promise<string[]> {
+  return (await catalog()).products.map((p) => p.id);
 }
 
 export async function getRelatedProducts(product: Product, limit = 4): Promise<Product[]> {

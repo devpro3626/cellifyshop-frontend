@@ -17,7 +17,7 @@ export function whatsappLink(message: string) {
 }
 
 /** Absolute link to a product page, optionally preselecting its options. */
-export function productUrl(slug: string, selection: Record<string, string> = {}) {
+export function productUrl(id: string, selection: Record<string, string> = {}) {
   const query = new URLSearchParams(selection).toString();
-  return `${site.url}/product/${slug}${query ? `?${query}` : ""}`;
+  return `${site.url}/product/${id}${query ? `?${query}` : ""}`;
 }

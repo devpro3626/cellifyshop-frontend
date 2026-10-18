@@ -102,7 +102,7 @@ export function Hero() {
       <div className="shell grid items-center gap-6 pt-[calc(var(--header-h)+2.25rem)] pb-10 sm:gap-10 lg:min-h-[100svh] lg:grid-cols-[1.02fr_1fr] lg:gap-4 lg:pt-[calc(var(--header-h)+1.5rem)] lg:pb-16">
         <motion.div style={{ y: contentY, opacity: fade }} className="relative z-10 order-1 text-center lg:text-left">
           <MotionLink
-            href="/product/iphone-18-pro"
+            href="/products/iphones"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}

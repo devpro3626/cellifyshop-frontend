@@ -44,7 +44,7 @@ export function AccessoryBento({ items }: { items: BentoItem[] }) {
             const lead = i === 0;
             return (
               <Reveal key={item.product.id} delay={i * 0.06} className={SLOTS[i]}>
-                <Link href={`/product/${item.product.slug}`} className="group relative flex h-full flex-col overflow-hidden rounded-[28px] p-6 md:p-7" style={{ backgroundColor: item.product.tint }}>
+                <Link href={`/product/${item.product.id}`} className="group relative flex h-full flex-col overflow-hidden rounded-[28px] p-6 md:p-7" style={{ backgroundColor: item.product.tint }}>
                   <div className="relative z-10">
                     {item.product.badge && <p className="eyebrow mb-2 text-accent-ink">{item.product.badge}</p>}
                     <h3 className={cn("font-semibold", lead ? "text-[clamp(1.6rem,2.4vw,2.04rem)]" : "text-[1.15rem]")}>{item.product.name}</h3>

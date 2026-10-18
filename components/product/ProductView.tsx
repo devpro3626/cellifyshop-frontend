@@ -64,13 +64,13 @@ function ProductViewInner({ product, attributes, requested }: ProductViewProps &
     if (!variant || !inStock) return;
     bag.add({
       id: variant.id,
-      productSlug: product.slug,
+      productId: product.id,
       name: product.name,
       description: description || "Standard",
       image: media[0].src,
       tint: product.tint,
       price: variant.price,
-      url: productUrl(product.slug, variant.selection),
+      url: productUrl(product.id, variant.selection),
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1800);
@@ -79,7 +79,7 @@ function ProductViewInner({ product, attributes, requested }: ProductViewProps &
   // Every WhatsApp message carries a link that reopens this exact selection.
   const options_ = description ? ` (${description})` : "";
   const price = variant ? formatPrice(variant.price) : "";
-  const link = productUrl(product.slug, variant?.selection ?? selection);
+  const link = productUrl(product.id, variant?.selection ?? selection);
   const buyMessage = isService
     ? `Hi CellifyShop, I'd like to book a ${product.name}${options_}. Quoted price: ${price}. When can I come in?\n\n${link}`
     : `Hi CellifyShop, I'd like to buy the ${product.name}${options_} for ${price}. Is it available?\n\n${link}`;

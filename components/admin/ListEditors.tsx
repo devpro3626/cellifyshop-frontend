@@ -38,7 +38,12 @@ export function SpecList({ specs, onChange }: { specs: ProductSpec[]; onChange(s
 
 export function RemoveButton({ onClick, label = "Remove" }: { onClick(): void; label?: string }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-mute transition-colors hover:border-[#e5a59e] hover:text-[#a1261b]">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-mute transition-colors hover:border-[#e5a59e] hover:text-[#a1261b]"
+    >
       <Icon name="close" size={16} />
     </button>
   );

@@ -7,17 +7,17 @@ import { ProductShelf } from "@/components/product/ProductShelf";
 import { ProductView } from "@/components/product/ProductView";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { getAttributes, getCategoryById, getProduct, getProductSlugs, getRelatedProducts } from "@/lib/catalog/repository";
+import { getAttributes, getCategoryById, getProduct, getProductIds, getRelatedProducts } from "@/lib/catalog/repository";
 import { optionValues, priceRange } from "@/lib/catalog/variants";
 import { site } from "@/lib/config/site";
 
 export async function generateStaticParams() {
-  const slugs = await getProductSlugs();
-  return slugs.map((slug) => ({ slug }));
+  const ids = await getProductIds();
+  return ids.map((id) => ({ id }));
 }
 
-export async function generateMetadata({ params }: PageProps<"/product/[slug]">): Promise<Metadata> {
-  const product = await getProduct((await params).slug);
+export async function generateMetadata({ params }: PageProps<"/product/[id]">): Promise<Metadata> {
+  const product = await getProduct((await params).id);
   if (!product) return {};
   return {
     title: product.name,
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/product/[slug]">)
   };
 }
 
-export default function ProductPage({ params }: PageProps<"/product/[slug]">) {
+export default function ProductPage({ params }: PageProps<"/product/[id]">) {
   return (
     <Suspense fallback={<ProductSkeleton />}>
       <ProductContent params={params} />
@@ -34,10 +34,10 @@ export default function ProductPage({ params }: PageProps<"/product/[slug]">) {
   );
 }
 
-/** Reads the slug inside Suspense so navigations between products stay instant. */
-async function ProductContent({ params }: Pick<PageProps<"/product/[slug]">, "params">) {
-  const { slug } = await params;
-  const [product, attributes] = await Promise.all([getProduct(slug), getAttributes()]);
+/** Reads the id inside Suspense so navigations between products stay instant. */
+async function ProductContent({ params }: Pick<PageProps<"/product/[id]">, "params">) {
+  const { id } = await params;
+  const [product, attributes] = await Promise.all([getProduct(id), getAttributes()]);
   if (!product) notFound();
 
   const [category, related] = await Promise.all([getCategoryById(product.categoryId), getRelatedProducts(product, 6)]);

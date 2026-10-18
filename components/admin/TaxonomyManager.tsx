@@ -3,17 +3,24 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteAttribute, saveAttribute } from "@/lib/admin/actions";
+import { withBusy } from "@/lib/admin/busy";
 import type { Attribute, AttributeDisplay } from "@/lib/catalog/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { AddButton, RemoveButton } from "./ListEditors";
-import { Field, inputClass, Notice } from "./ui";
+import { useConfirm } from "./ConfirmDialog";
+import { Flash, useFlash } from "./Flash";
+import { Field, inputClass } from "./ui";
 
 const DISPLAYS: { id: AttributeDisplay; label: string; hint: string }[] = [
   { id: "swatch", label: "Colour swatches", hint: "Round colour dots" },
   { id: "pill", label: "Buttons", hint: "e.g. storage sizes" },
-  { id: "list", label: "Descriptive list", hint: "Label with a short description" },
+  {
+    id: "list",
+    label: "Descriptive list",
+    hint: "Label with a short description",
+  },
 ];
 
 export function TaxonomyManager({ attributes, usage }: { attributes: Attribute[]; usage: Record<string, number> }) {
@@ -32,7 +39,18 @@ export function TaxonomyManager({ attributes, usage }: { attributes: Attribute[]
         />
       ))}
       {creating ? (
-        <AttributeEditor attribute={{ id: "", name: "", display: "pill", values: [{ id: "", label: "" }] }} usedBy={0} open isNew onToggle={() => setCreating(false)} />
+        <AttributeEditor
+          attribute={{
+            id: "",
+            name: "",
+            display: "pill",
+            values: [{ id: "", label: "" }],
+          }}
+          usedBy={0}
+          open
+          isNew
+          onToggle={() => setCreating(false)}
+        />
       ) : (
         <button
           type="button"
@@ -57,32 +75,42 @@ interface EditorProps {
 function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: EditorProps) {
   const router = useRouter();
   const [draft, setDraft] = useState(attribute);
-  const [status, setStatus] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+  const [status, setStatus] = useFlash();
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
 
-  const updateValue = (i: number, patch: Partial<Attribute["values"][number]>) => setDraft((d) => ({ ...d, values: d.values.map((v, j) => (j === i ? { ...v, ...patch } : v)) }));
+  const updateValue = (i: number, patch: Partial<Attribute["values"][number]>) =>
+    setDraft((d) => ({
+      ...d,
+      values: d.values.map((v, j) => (j === i ? { ...v, ...patch } : v)),
+    }));
 
   const save = () =>
     startTransition(async () => {
-      const result = await saveAttribute(draft, isNew);
+      const result = await withBusy(() => saveAttribute(draft, isNew));
       if (!result.ok) return setStatus({ tone: "error", text: result.error });
       setStatus({ tone: "success", text: "Saved." });
       if (isNew) onToggle();
       router.refresh();
     });
 
-  const remove = () => {
-    if (!window.confirm(`Delete the “${attribute.name}” attribute?`)) return;
-    startTransition(async () => {
-      const result = await deleteAttribute(attribute.id);
-      if (!result.ok) return setStatus({ tone: "error", text: result.error });
-      router.refresh();
+  const remove = async () => {
+    const deleted = await confirm({
+      title: `Delete the “${attribute.name}” attribute?`,
+      description: usedBy ? `It is used by ${usedBy} product${usedBy === 1 ? "" : "s"}; remove it from them first.` : "This cannot be undone.",
+      confirmLabel: "Delete attribute",
+      tone: "danger",
+      action: async () => {
+        const result = await withBusy(() => deleteAttribute(attribute.id));
+        return result.ok ? undefined : result.error;
+      },
     });
+    if (deleted) router.refresh();
   };
 
   return (
     <section className={cn("rounded-2xl border bg-surface transition-colors", open ? "border-ink/30" : "border-line")}>
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-4 px-5 py-4 text-left">
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-4 text-left sm:gap-4 sm:px-5">
         <span className="min-w-0 flex-1">
           <span className="block font-medium">{isNew ? "New attribute" : attribute.name}</span>
           {!isNew && (
@@ -97,18 +125,31 @@ function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: E
             </span>
           )}
         </span>
-        {!isNew && <span className="hidden text-[0.82rem] text-mute sm:block">Used by {usedBy} product{usedBy === 1 ? "" : "s"}</span>}
+        {!isNew && (
+          <span className="hidden text-[0.82rem] text-mute sm:block">
+            Used by {usedBy} product{usedBy === 1 ? "" : "s"}
+          </span>
+        )}
         <Icon name="chevronDown" size={18} className={cn("text-mute transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="grid gap-5 border-t border-line p-5">
+        <div className="grid gap-5 border-t border-line p-4 sm:p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name" hint={isNew ? "e.g. Colour, Storage, Condition" : undefined}>
               <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={inputClass} />
             </Field>
             <Field label="Shown as">
-              <select value={draft.display} onChange={(e) => setDraft({ ...draft, display: e.target.value as AttributeDisplay })} className={inputClass}>
+              <select
+                value={draft.display}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    display: e.target.value as AttributeDisplay,
+                  })
+                }
+                className={inputClass}
+              >
                 {DISPLAYS.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.label} ({d.hint})
@@ -136,17 +177,40 @@ function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: E
                   {draft.display === "list" && (
                     <input value={value.hint ?? ""} onChange={(e) => updateValue(i, { hint: e.target.value })} placeholder="Short description" className={cn(inputClass, "min-w-0 flex-[1.4]")} />
                   )}
-                  <RemoveButton onClick={() => setDraft({ ...draft, values: draft.values.filter((_, j) => j !== i) })} />
+                  <RemoveButton
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        values: draft.values.filter((_, j) => j !== i),
+                      })
+                    }
+                  />
                 </div>
               ))}
             </div>
             <div className="mt-2">
-              <AddButton onClick={() => setDraft({ ...draft, values: [...draft.values, { id: "", label: "", ...(draft.display === "swatch" ? { hex: "#cccccc" } : {}) }] })}>Add value</AddButton>
+              <AddButton
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    values: [
+                      ...draft.values,
+                      {
+                        id: "",
+                        label: "",
+                        ...(draft.display === "swatch" ? { hex: "#cccccc" } : {}),
+                      },
+                    ],
+                  })
+                }
+              >
+                Add value
+              </AddButton>
             </div>
           </div>
 
-          {status && <Notice tone={status.tone}>{status.text}</Notice>}
-          <div className="flex items-center justify-between gap-2">
+          <Flash flash={status} onDismiss={() => setStatus(null)} />
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {!isNew ? (
               <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={pending} className="text-[#a1261b]">
                 Delete attribute
@@ -158,13 +222,14 @@ function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: E
               <Button type="button" variant="outline" size="sm" onClick={onToggle}>
                 {isNew ? "Cancel" : "Close"}
               </Button>
-              <Button type="button" variant="dark" size="sm" onClick={save} disabled={pending}>
+              <Button type="button" variant="dark" size="sm" onClick={save} loading={pending}>
                 {pending ? "Saving…" : "Save"}
               </Button>
             </div>
           </div>
         </div>
       )}
+      {dialog}
     </section>
   );
 }

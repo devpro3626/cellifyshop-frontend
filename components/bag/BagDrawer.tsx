@@ -13,7 +13,7 @@ import { Icon } from "@/components/ui/Icon";
 /** Order summary for WhatsApp; each line links back to the exact variant. */
 function orderMessage(lines: BagLine[], subtotal: number) {
   const rows = lines.map(
-    (l) => `• ${l.quantity} × ${l.name} (${l.description}): ${formatPrice(l.price * l.quantity)}\n  ${l.url ?? productUrl(l.productSlug)}`,
+    (l) => `• ${l.quantity} × ${l.name} (${l.description}): ${formatPrice(l.price * l.quantity)}\n  ${l.url ?? productUrl(l.productId)}`,
   );
   return [`Hi CellifyShop, I'd like to order:`, ``, ...rows, ``, `Subtotal: ${formatPrice(subtotal)}`].join("\n");
 }
@@ -84,7 +84,7 @@ export function BagDrawer() {
                     {lines.map((line) => (
                       <motion.li key={line.id} layout exit={{ opacity: 0, x: 40 }} className="flex gap-4 py-5">
                         <Link
-                          href={`/product/${line.productSlug}`}
+                          href={`/product/${line.productId}`}
                           onClick={() => bag.setOpen(false)}
                           className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl"
                           style={{ backgroundColor: line.tint }}

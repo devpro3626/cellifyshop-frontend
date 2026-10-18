@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Spinner } from "./Spinner";
 
-type Variant = "primary" | "dark" | "light" | "outline" | "outline-light" | "ghost" | "whatsapp";
+type Variant = "primary" | "dark" | "light" | "outline" | "outline-light" | "ghost" | "whatsapp" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const base =
@@ -16,6 +17,7 @@ const variants: Record<Variant, string> = {
   "outline-light": "border border-white/25 text-white hover:border-white hover:bg-white/5",
   ghost: "text-ink hover:bg-ink/5",
   whatsapp: "bg-whatsapp text-white hover:bg-whatsapp-strong",
+  danger: "bg-[#b42318] text-white hover:bg-[#912018]",
 };
 
 const sizes: Record<Size, string> = {
@@ -54,11 +56,16 @@ export function ButtonLink({ variant, size, arrow, children, className, ...props
   );
 }
 
-export function Button({ variant, size, arrow, children, className, ...props }: Common & ComponentProps<"button">) {
+/**
+ * `loading` shows a spinner, disables the button and marks it busy, so an
+ * action can't be submitted twice while it runs.
+ */
+export function Button({ variant, size, arrow, loading, disabled, children, className, ...props }: Common & ComponentProps<"button"> & { loading?: boolean }) {
   return (
-    <button className={buttonClass({ variant, size, className })} {...props}>
+    <button className={buttonClass({ variant, size, className })} disabled={disabled || loading} aria-busy={loading || undefined} {...props}>
+      {loading && <Spinner size={size === "sm" ? 14 : 16} />}
       {children}
-      {arrow && <Arrow />}
+      {arrow && !loading && <Arrow />}
     </button>
   );
 }
