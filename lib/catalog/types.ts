@@ -1,0 +1,120 @@
+/**
+ * Catalog domain model.
+ *
+ * The shapes here mirror what the future admin portal will manage:
+ *   - Attributes (taxonomy) are global: "Colour", "Storage", "Condition"…
+ *     Each attribute owns a list of values. Products pick the subset they offer.
+ *   - Categories group products and carry their own landing copy.
+ *   - Products declare which attribute values they offer (`options`) and an
+ *     explicit list of purchasable `variants` (one per option combination),
+ *     each with its own price and stock.
+ *
+ * Keep these types serialisable (no functions, no class instances) so they can
+ * be returned from an API or a database row without transformation.
+ */
+
+export type AttributeId = string;
+export type AttributeValueId = string;
+
+/** How an attribute is rendered in the variant picker. */
+export type AttributeDisplay = "swatch" | "pill" | "list";
+
+export interface AttributeValue {
+  id: AttributeValueId;
+  label: string;
+  /** Only used by swatch attributes (colour). */
+  hex?: string;
+  /** Optional secondary line, e.g. "Battery health 90%+" for a condition. */
+  hint?: string;
+}
+
+export interface Attribute {
+  id: AttributeId;
+  name: string;
+  display: AttributeDisplay;
+  values: AttributeValue[];
+}
+
+export interface Category {
+  id: string;
+  slug: string;
+  name: string;
+  /** Short line used on navigation tiles. */
+  tagline: string;
+  description: string;
+  image: string;
+  /** "contain" for product cut-outs, "cover" for full-bleed photography. */
+  imageFit: "contain" | "cover";
+  /** Background tint for tiles and headers. */
+  tint: string;
+  order: number;
+}
+
+/** One attribute offered by a product, with the values in display order. */
+export interface ProductOption {
+  attributeId: AttributeId;
+  valueIds: AttributeValueId[];
+}
+
+/** A single purchasable combination of option values. */
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  /** attributeId → valueId for every option on the product. */
+  selection: Record<AttributeId, AttributeValueId>;
+  price: number;
+  compareAtPrice?: number;
+  stock: number;
+}
+
+export interface ProductMedia {
+  src: string;
+  alt: string;
+  /**
+   * When set, the image belongs to these option values (e.g. a colour).
+   * Images without a match are shown for every selection.
+   */
+  match?: Record<AttributeId, AttributeValueId>;
+}
+
+export interface ProductSpec {
+  label: string;
+  value: string;
+}
+
+export type ProductKind = "device" | "accessory" | "service";
+
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  categoryId: string;
+  kind: ProductKind;
+  /** Small label above the name, e.g. "New" or "Pre-owned". */
+  badge?: string;
+  summary: string;
+  description: string;
+  highlights: string[];
+  specs: ProductSpec[];
+  inTheBox?: string[];
+  options: ProductOption[];
+  variants: ProductVariant[];
+  media: ProductMedia[];
+  /** Soft background colour behind product imagery. */
+  tint: string;
+  featured: boolean;
+  /** ISO date, used for "newest" sorting. */
+  createdAt: string;
+  /** Services only: typical turnaround shown on the card. */
+  turnaround?: string;
+  warranty?: string;
+}
+
+export type ProductSort = "featured" | "newest" | "price-asc" | "price-desc";
+
+export interface ProductQuery {
+  categorySlug?: string;
+  featured?: boolean;
+  limit?: number;
+  sort?: ProductSort;
+}

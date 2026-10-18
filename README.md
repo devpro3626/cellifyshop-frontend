@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CellifyShop: storefront and admin
 
-## Getting Started
-
-First, run the development server:
+Next.js 16 (App Router, Cache Components) store for iPhones, same-day repairs and accessories, with a simple admin portal.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev      # http://localhost:3000
+npm run build    # production build
+npm run images   # (re)download the starting product and editorial imagery
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Pages
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Route | What it is |
+| --- | --- |
+| `/` | Home |
+| `/products` | All products, grouped by category |
+| `/products/[category]` | One category with search, sort and filters |
+| `/product/[slug]` | Product page: gallery, options, price, Buy on WhatsApp |
+| `/about`, `/contact` | Company and contact pages |
+| `/admin` | Admin portal (password protected) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prices are in AED. Buy, booking and contact buttons open WhatsApp (+971 56 236 1397) with a pre-filled message. Contact details live in `lib/config/site.ts`.
 
-## Learn More
+## Admin portal (version 1)
 
-To learn more about Next.js, take a look at the following resources:
+Sign in at `/admin`. Set the password in `.env.local`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+ADMIN_PASSWORD=your-strong-password
+ADMIN_SECRET=another-long-random-string   # optional, signs the session cookie
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+In development, if `ADMIN_PASSWORD` is not set, the password is `cellify-admin` (shown on the sign-in page). In production the portal stays locked until `ADMIN_PASSWORD` is set.
 
-## Deploy on Vercel
+- **Products:** create and edit name, category, images (upload or path, tag by colour), options from the taxonomy, and a price and stock for every variant. Highlights, specs and box contents are edited here too.
+- **Categories:** create, edit, reorder, and delete empty categories.
+- **Taxonomy:** create and edit attributes (Colour, Storage, Condition…) and their values. Values in use can't be removed.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Changes appear on the store immediately: every save calls `updateTag("catalog")`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Where data is stored
+
+The catalogue is one JSON file, `data/catalog.json`, created from the seed in `lib/catalog/data` on first run. Uploaded images go to `data/uploads` and are served from `/uploads/…`. This suits a single server (`next start`, a VPS, or a container with a persistent volume). For serverless hosting, replace `readCatalog`/`writeCatalog` in `lib/catalog/store.ts` and the upload target in `lib/admin/actions.ts` with a database and object storage; no page code changes.
+
+## Structure
+
+```
+app/(store)/      Storefront pages
+app/admin/        Admin portal: login and the (panel) screens behind the session check
+app/uploads/      Serves uploaded images
+components/       home, product, shop, layout, bag, admin, three (hero light field), ui
+lib/catalog/      types, seed data, store (file), repository (cached reads), variant helpers
+lib/admin/        auth (signed session cookie), server actions
+lib/config/       site settings: name, currency, contact, navigation
+```
+
+## Imagery
+
+`scripts/fetch-images.mjs` downloads the starting images: product cut-outs from Apple's public store image service, and workshop photography from Unsplash (Unsplash License, credits in the manifest). Before going live, confirm you're permitted to use manufacturer imagery, or replace the files with your own. New images can also be uploaded from the admin portal.
