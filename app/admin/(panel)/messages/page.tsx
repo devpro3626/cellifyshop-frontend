@@ -32,7 +32,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps<"/ad
   return (
     <AdminPage title="Messages" description={`From the contact page. ${result.unread} unread.`}>
       <div className="rounded-2xl border border-line bg-surface">
-        <div className="flex gap-1 overflow-x-auto border-b border-line px-4 pt-3">
+        <div className="flex gap-1 border-b border-line px-4 pt-3">
           {STATUSES.map((s) => {
             const params = new URLSearchParams();
             if (s.id !== "all") params.set("status", s.id);

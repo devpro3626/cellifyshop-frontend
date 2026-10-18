@@ -1,6 +1,6 @@
 "use server";
 
-import { updateTag } from "next/cache";
+import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { adminCatalogApi } from "@/lib/api/catalog.api";
 import { messagesApi } from "@/lib/api/messages.api";
@@ -13,6 +13,10 @@ import { signIn, signOut } from "./auth";
  * Server actions behind the admin portal. Each forwards to the CellifyShop API
  * (which validates input and checks the admin token), then refreshes every
  * storefront page that reads the catalogue.
+ *
+ * On success they also re-render the current admin page. The fresh page comes
+ * back in the same response as the result, so a list already shows the change
+ * when the loader stops (no second round trip with router.refresh()).
  */
 
 export type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -23,10 +27,11 @@ function errorMessage(error: unknown) {
 }
 
 /** Run an API write, refresh the storefront cache, and report the outcome to the form. */
-async function write<T>(work: () => Promise<T>): Promise<ActionResult<T>> {
+async function write<T>(work: () => Promise<T>, rerender = true): Promise<ActionResult<T>> {
   try {
     const data = await work();
     updateTag(CATALOG_TAG);
+    if (rerender) refresh();
     return { ok: true, data };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
@@ -95,26 +100,32 @@ export async function saveProduct(input: Product): Promise<ActionResult<{ id: st
   });
 }
 
+/** On success, goes straight to the product list (the edit page no longer exists). */
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  return write(() => adminCatalogApi.deleteProduct(id));
+  const result = await write(() => adminCatalogApi.deleteProduct(id), false);
+  if (result.ok) redirect("/admin/products");
+  return result;
 }
 
 /* ── Messages ─────────────────────────────────────────────────────────── */
 
-/** Messages don't affect the storefront, so no cache refresh is needed. */
-async function call<T>(work: () => Promise<T>): Promise<ActionResult<T>> {
+/** Messages don't affect the storefront, so only the admin page is re-rendered. */
+async function call<T>(work: () => Promise<T>, rerender = true): Promise<ActionResult<T>> {
   try {
-    return { ok: true, data: await work() };
+    const data = await work();
+    if (rerender) refresh();
+    return { ok: true, data };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }
 }
 
-export async function setMessageRead(id: string, read: boolean): Promise<ActionResult> {
+/** `rerender: false` saves quietly, e.g. when opening a message, so it stays in view. */
+export async function setMessageRead(id: string, read: boolean, rerender = true): Promise<ActionResult> {
   return call(async () => {
     await messagesApi.setRead(id, read);
     return undefined;
-  });
+  }, rerender);
 }
 
 export async function deleteMessage(id: string): Promise<ActionResult> {

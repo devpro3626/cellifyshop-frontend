@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteMessage, setMessageRead } from "@/lib/admin/actions";
 import type { ContactMessage } from "@/lib/catalog/types";
@@ -22,7 +21,6 @@ const dateFormat = new Intl.DateTimeFormat("en-AE", {
 const whatsappTo = (phone: string, name: string) => `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${name}, this is CellifyShop replying to your message.`)}`;
 
 export function MessageList({ messages }: { messages: ContactMessage[] }) {
-  const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** Read state changed in this view; keeps an opened message visible until the next refresh. */
@@ -35,7 +33,6 @@ export function MessageList({ messages }: { messages: ContactMessage[] }) {
     startTransition(async () => {
       const result = await withBusy(() => setMessageRead(m.id, !isRead(m)));
       setError(result.ok ? null : result.error);
-      router.refresh();
     });
 
   const remove = async (m: ContactMessage) => {
@@ -51,7 +48,6 @@ export function MessageList({ messages }: { messages: ContactMessage[] }) {
     });
     if (deleted) {
       setOpenId(null);
-      router.refresh();
     }
   };
 
@@ -62,7 +58,7 @@ export function MessageList({ messages }: { messages: ContactMessage[] }) {
     // refreshing so the message stays in view (even on the Unread tab).
     if (next && !isRead(message)) {
       setReadOverride((o) => ({ ...o, [message.id]: true }));
-      setMessageRead(message.id, true).then((result) => !result.ok && setError(result.error));
+      setMessageRead(message.id, true, false).then((result) => !result.ok && setError(result.error));
     }
   };
 

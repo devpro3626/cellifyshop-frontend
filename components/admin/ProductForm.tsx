@@ -131,11 +131,10 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
       }
       setStatus({ tone: "success", text: "Saved. The store is updated." });
       if (isNew && result.data) router.replace(`/admin/products/${result.data.id}`);
-      router.refresh();
     });
 
   const remove = async () => {
-    const deleted = await confirm({
+    await confirm({
       title: `Delete “${draft.name}”?`,
       description: "It will be removed from the store straight away. This can't be undone.",
       confirmLabel: "Delete product",
@@ -145,10 +144,6 @@ export function ProductForm({ initial, categories, attributes, isNew }: ProductF
         return result.ok ? undefined : result.error;
       },
     });
-    if (deleted) {
-      router.push("/admin/products");
-      router.refresh();
-    }
   };
 
   return (

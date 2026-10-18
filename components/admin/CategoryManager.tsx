@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { deleteCategory, saveCategory } from "@/lib/admin/actions";
 import { withBusy } from "@/lib/admin/busy";
@@ -27,7 +26,6 @@ const blank = (order: number): Category => ({
 });
 
 export function CategoryManager({ categories, counts }: { categories: Category[]; counts: Record<string, number> }) {
-  const router = useRouter();
   const [editing, setEditing] = useState<Category | null>(null);
   const [status, setStatus] = useFlash();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -55,7 +53,6 @@ export function CategoryManager({ categories, counts }: { categories: Category[]
       if (!result.ok) return setStatus({ tone: "error", text: result.error });
       setStatus({ tone: "success", text: "Category saved." });
       setEditing(null);
-      router.refresh();
     });
 
   const remove = async (category: Category) => {
@@ -72,7 +69,6 @@ export function CategoryManager({ categories, counts }: { categories: Category[]
     if (deleted) {
       setStatus({ tone: "success", text: "Category deleted." });
       setEditing(null);
-      router.refresh();
     }
   };
 

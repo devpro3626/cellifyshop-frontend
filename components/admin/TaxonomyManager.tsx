@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteAttribute, saveAttribute } from "@/lib/admin/actions";
 import { withBusy } from "@/lib/admin/busy";
@@ -73,7 +72,6 @@ interface EditorProps {
 }
 
 function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: EditorProps) {
-  const router = useRouter();
   const [draft, setDraft] = useState(attribute);
   const [status, setStatus] = useFlash();
   const [pending, startTransition] = useTransition();
@@ -91,11 +89,10 @@ function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: E
       if (!result.ok) return setStatus({ tone: "error", text: result.error });
       setStatus({ tone: "success", text: "Saved." });
       if (isNew) onToggle();
-      router.refresh();
     });
 
   const remove = async () => {
-    const deleted = await confirm({
+    await confirm({
       title: `Delete the “${attribute.name}” attribute?`,
       description: usedBy ? `It is used by ${usedBy} product${usedBy === 1 ? "" : "s"}; remove it from them first.` : "This cannot be undone.",
       confirmLabel: "Delete attribute",
@@ -105,7 +102,6 @@ function AttributeEditor({ attribute, usedBy, open, isNew = false, onToggle }: E
         return result.ok ? undefined : result.error;
       },
     });
-    if (deleted) router.refresh();
   };
 
   return (

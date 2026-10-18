@@ -18,7 +18,6 @@ export default function LoginPage() {
           <h1 className="text-2xl tracking-[-0.03em]">Sign in</h1>
           <p className="mt-1 text-[0.9rem] text-mute">Manage products, categories and taxonomy.</p>
           <LoginForm />
-          <p className="mt-5 text-[0.8rem] text-mute">The password is set by ADMIN_PASSWORD in the API&rsquo;s environment.</p>
         </div>
       </div>
     </main>
